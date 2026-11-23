@@ -22,3 +22,9 @@
 - 音訊解碼使用 [ffmpeg.wasm 單執行緒核心 `@ffmpeg/core` 0.12.10](https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v12.15)。核心採 GPL-2.0-or-later，上游版本包含對應的原始碼、建置設定與依賴版本。ffmpeg.wasm 封裝程式採 MIT。
 - 語音辨識使用 [whisper.node 的單執行緒 WebAssembly 1.2.0-rc.2](https://github.com/mybigday/whisper.node/tree/5274f7a7886557b665988fba505f7255db1a1bfb)，內含 [whisper.cpp](https://github.com/ggml-org/whisper.cpp)，採 MIT。隨附 [Whisper Base 多語量化模型](https://huggingface.co/ggerganov/whisper.cpp/blob/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q5_1.bin)，其上游 [OpenAI Whisper](https://github.com/openai/whisper) 採 MIT。
 - `vendor/` 收錄上游授權檔。`prepare-assets.mjs` 可用來重建引擎與模型封裝，需要 Node.js 22、`tar` 和網路。平常開啟網頁不需要執行這支指令。封裝以本機指令碼載入模型資料，讓網頁直接從 `file://` 執行。
+
+## 授權
+
+本專案自行撰寫的程式碼與文件依 GNU General Public License 第 2 版或任何後續版本授權（`GPL-2.0-or-later`）。授權全文見 [LICENSE](LICENSE)。第三方元件仍依各自的授權條款散布。
+
+內附 FFmpeg 核心的原始碼快照、建置腳本與相依套件可從 [FFmpeg 對應原始碼封存檔](https://github.com/ghliaw/video-subtitle-generator/releases/download/ffmpeg-core-source-0.12.10/ffmpeg-core-0.12.10-source.tar) 取得。封存檔的內容與建置步驟見 [第三方元件建置說明](third-party/README.md)。

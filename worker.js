@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /* The page starts this function in a Blob worker, including from file://. */
 function subtitleWorkerMain() {
   'use strict';
