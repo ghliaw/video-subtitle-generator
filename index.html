@@ -52,7 +52,17 @@
             <option value="de">德語</option>
           </select>
         </div>
-        <p>資料夾會包含子資料夾。若同一批影片的語言不同，請保留自動辨識。</p>
+        <div>
+          <label for="model-mode">辨識模式</label>
+          <select id="model-mode" aria-describedby="model-hint">
+            <option value="base" selected>標準（Base Q5_1）</option>
+            <option value="small">高準確度（Small Q5_1）</option>
+          </select>
+        </div>
+        <div>
+          <p id="model-hint">高準確度模式需要較長的處理時間與較多記憶體。</p>
+          <p>資料夾會包含子資料夾。若同一批影片的語言不同，請保留自動辨識。</p>
+        </div>
       </div>
     </section>
 

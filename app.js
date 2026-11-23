@@ -4,7 +4,7 @@
 
 const OfflineAssets = (() => {
   const receivers = new Map();
-  function load(id, signal) {
+  function load(id, signal, destination) {
     let cleanup;
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -13,13 +13,18 @@ const OfflineAssets = (() => {
       receivers.set(id, chunks => {
         if (document.currentScript !== script) return;
         try {
-          const parts = chunks.map(chunk => {
-            if (Uint8Array.fromBase64) return Uint8Array.fromBase64(chunk);
-            return Uint8Array.from(atob(chunk), char => char.charCodeAt(0));
-          });
-          const bytes = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+          const size = chunks.reduce((total, chunk) => {
+            const padding = chunk.match(/=+$/)?.[0].length ?? 0;
+            return total + chunk.length * 3 / 4 - padding;
+          }, 0);
+          if (destination && size !== destination.length) {
+            throw new Error(`離線元件 ${id} 大小不符。請重新完整解壓縮。`);
+          }
+          const bytes = destination ?? new Uint8Array(size);
           let offset = 0;
-          for (const part of parts) {
+          for (const chunk of chunks) {
+            const part = Uint8Array.fromBase64 ? Uint8Array.fromBase64(chunk) :
+              Uint8Array.from(atob(chunk), char => char.charCodeAt(0));
             bytes.set(part, offset);
             offset += part.length;
           }
@@ -46,8 +51,10 @@ const OfflineAssets = (() => {
 (() => {
   const $ = id => document.getElementById(id);
   const ui = Object.fromEntries(['choose-file', 'choose-folder', 'file-input', 'folder-input',
-    'dropzone', 'language', 'summary', 'clear', 'empty', 'queue', 'message', 'download-all',
+    'dropzone', 'language', 'model-mode', 'summary', 'clear', 'empty', 'queue', 'message', 'download-all',
     'stop', 'start'].map(id => [id, $(id)]));
+  const smallModelSize = 190085487;
+  const smallPartSize = 32 * 1024 * 1024;
   const extensions = /\.(mp4|m4v|mov|mkv|webm|avi|mpeg|mpg|ts|mts|m2ts|flv|wmv|3gp|ogv)$/i;
   const jobs = [];
   const keys = new Set();
@@ -107,6 +114,7 @@ const OfflineAssets = (() => {
       skipped && `${skipped} 部無字幕`, failed && `${failed} 部失敗`].filter(Boolean).join(' · ') : '尚未加入影片';
     ui.empty.hidden = Boolean(jobs.length);
     ui['choose-file'].disabled = ui['choose-folder'].disabled = ui.language.disabled = busy;
+    ui['model-mode'].disabled = busy;
     ui.clear.disabled = busy || !jobs.length;
     ui.start.hidden = busy;
     ui.start.disabled = !jobs.some(job => ['queued', 'failed', 'stopped'].includes(job.state));
@@ -182,22 +190,23 @@ const OfflineAssets = (() => {
     run = new AbortController();
     const { signal } = run;
     const language = ui.language.value;
+    const useSmallModel = ui['model-mode'].value === 'small';
     let worker;
     let workerUrl;
 
     refreshControls();
     try {
-      ui.message.textContent = '正在載入本機辨識模型…';
-      const load = id => {
+      ui.message.textContent = useSmallModel ? '正在載入高準確度模型…' : '正在載入標準模型…';
+      const load = (id, destination) => {
         signal.throwIfAborted();
-        return OfflineAssets.load(id, signal);
+        return OfflineAssets.load(id, signal, destination);
       };
       const textDecoder = new TextDecoder();
       const ffmpegScript = textDecoder.decode(await load('ffmpeg-runtime'));
       const whisperScript = textDecoder.decode(await load('whisper-runtime'));
       const ffmpegWasm = await load('ffmpeg-wasm');
       const whisperWasm = await load('whisper-wasm');
-      const model = await load('whisper-model');
+      const model = useSmallModel ? await loadSmallModel(load) : await load('whisper-model');
       signal.throwIfAborted();
       const source = [ffmpegScript, '\n;\n', whisperScript, '\n;\n', `(${subtitleWorkerMain.toString()})();`];
       workerUrl = URL.createObjectURL(new Blob(source, { type: 'text/javascript' }));
@@ -244,6 +253,17 @@ const OfflineAssets = (() => {
       run = null;
       refreshControls();
     }
+  }
+
+  async function loadSmallModel(load) {
+    const model = new Uint8Array(smallModelSize);
+    const partCount = Math.ceil(model.length / smallPartSize);
+    for (let part = 1; part <= partCount; part++) {
+      const offset = (part - 1) * smallPartSize;
+      ui.message.textContent = `正在載入高準確度模型（${part}／${partCount}）…`;
+      await load(`whisper-small-${part}`, model.subarray(offset, offset + smallPartSize));
+    }
+    return model;
   }
 
   for (const type of ['file', 'folder']) {

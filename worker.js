@@ -7,7 +7,7 @@ function subtitleWorkerMain() {
   const sampleRate = 16000;
   const inputDirectory = '/videos';
   const audioPath = '/transcription.f32';
-  const modelPath = '/whisper-base.bin';
+  const modelPath = '/whisper-model.bin';
   let ffmpeg;
   let whisper;
   let context;

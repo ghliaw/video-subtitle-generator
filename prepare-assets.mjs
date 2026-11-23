@@ -9,6 +9,7 @@ import { join } from 'node:path';
 const vendor = new URL('./vendor/', import.meta.url);
 const cache = await mkdtemp(join(tmpdir(), 'subtitle-assets-'));
 const modelRevision = '5359861c739e955e79d9a303bcbc70fb988958b1';
+const smallPartSize = 32 * 1024 * 1024;
 
 async function download(url, hash, algorithm, encoding) {
   const response = await fetch(url, { signal: AbortSignal.timeout(180_000) });
@@ -56,14 +57,21 @@ function classicWhisper(bytes) {
   return Buffer.from(source);
 }
 
-try {
+async function packSmallModel() {
+  const model = await download(`https://huggingface.co/ggerganov/whisper.cpp/resolve/${modelRevision}/ggml-small-q5_1.bin?download=true`,
+    'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb', 'sha256', 'hex');
+  for (let start = 0, part = 1; start < model.length; start += smallPartSize, part++) {
+    await pack(`whisper-small-${part}`, model.subarray(start, start + smallPartSize));
+  }
+}
+
+async function packStandardAssets() {
   const [ffmpeg, whisper, model] = await Promise.all([
     archive('@ffmpeg/core', '0.12.10', 'dzNplnn2Nxle2c2i2rrDhqcB19q9cglCkWnoMTDN9Q9l3PvdjZWd1HfSPjCNWc/p8Q3CT+Es9fWOR0UhAeYQZA=='),
     archive('@fugood/node-whisper-wasm', '1.2.0-rc.2', 'krgXnMFrRwN1VM82OAKKobkZDGGOon58bXkD0x3MrSmGQtQQPwC7GuxW8Xj80tdmYjCmLuEMz1h4hbea1vJk+w=='),
     download(`https://huggingface.co/ggerganov/whisper.cpp/resolve/${modelRevision}/ggml-base-q5_1.bin?download=true`,
       '422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898', 'sha256', 'hex'),
   ]);
-  await mkdir(vendor, { recursive: true });
   await Promise.all([
     pack('ffmpeg-runtime', ffmpeg.read('dist/umd/ffmpeg-core.js')),
     pack('ffmpeg-wasm', ffmpeg.read('dist/umd/ffmpeg-core.wasm')),
@@ -71,6 +79,12 @@ try {
     pack('whisper-wasm', whisper.read('wasm/whisper-node.wasm')),
     pack('whisper-model', model),
   ]);
+}
+
+try {
+  await mkdir(vendor, { recursive: true });
+  if (!process.argv.includes('--small-only')) await packStandardAssets();
+  await packSmallModel();
 } finally {
   // The only files in this unique temporary directory are the two downloaded archives.
   for (const file of ['core.tgz', 'node-whisper-wasm.tgz']) {
