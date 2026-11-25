@@ -163,7 +163,7 @@ const OfflineAssets = (() => {
         if (data.type === 'progress') onProgress(data);
         if (data.type === expected || data.type === 'failure') {
           cleanup();
-          if (data.type === 'failure') reject(new Error(data.message));
+          if (data.type === 'failure') reject(Object.assign(new Error(data.message), { fatal: data.fatal }));
           else resolve(data);
         }
       };
@@ -223,7 +223,8 @@ const OfflineAssets = (() => {
         try {
           const result = await request(worker, { type: 'transcribe', file: job.file, language }, 'result', signal, update => {
             job.percent = update.stage === 'recognize' ? Math.max(0, Math.min(100, Math.round(update.percent))) : null;
-            job.detail = job.percent == null ? '正在讀取音軌…' : `正在辨識語音 · ${job.percent}%`;
+            const part = update.part > 1 ? `第 ${update.part} 段 · ` : '';
+            job.detail = job.percent == null ? `${part}正在讀取音軌…` : `${part}正在辨識語音 · ${job.percent}%`;
             paintJob(job);
           });
           job.srt = Subtitle.toSrt(result.segments, result.duration);
